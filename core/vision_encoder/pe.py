@@ -9,7 +9,7 @@ import mlx.nn as nn
 
 
 from core.vision_encoder.rope import Rope2D
-from core.vision_encoder.config import PEConfig, PETextConfig, PE_VISION_CONFIG, PE_TEXT_CONFIG
+from core.vision_encoder.config import PEConfig, PETextConfig, PE_VISION_CONFIG, PE_TEXT_CONFIG, fetch_pe_checkpoint
 from core.vision_encoder.model_misc import DropPath
 
 logger = getLogger()
@@ -434,13 +434,12 @@ class VisionTransformer(nn.Module):
         if any(k.startswith("visual.") for k in _sd.keys()):
             _sd = {k.replace("visual.", ""): v for k, v in _sd.items() if "visual" in k}
         
-        m, u = self.load_weights(_sd, strict=False)
-
-        if verbose or (m or u):
-            logger.info(f"Missing keys for loading vision encoder: {m}")
-            logger.info(f"Unexpected keys for loading vision encoder: {u}")
-            print(f"Missing keys for loading vision encoder: {m}")
-            print(f"Unexpected keys for loading vision encoder: {u}")
+        try:
+            self.load_weights(_sd, strict=False)
+        except Exception as e:
+            logger.info(f"Exception while loading weights for vision encoder: {e}")
+            print(f"Exception while loading weights for vision encoder: {e}")
+            raise ValueError("Error loading weights for vision encoder") from e
         
     def truncate(self, layer_idx: int):
         """ Delete layers so the last layer is the given layer index. """
@@ -453,10 +452,19 @@ class VisionTransformer(nn.Module):
         name: str,
         pretrained: bool = False,
         checkpoint_path: Optional[str] = None,
-        **kwargs,
+        **kwdargs
     ):
-        # if name not in PE_V
-        pass
+        if name not in PE_VISION_CONFIG:
+            raise RuntimeError(f"{name} not found in configs.")
+    
+        args = asdict(PE_VISION_CONFIG[name])
+        args.update(kwdargs)
+        
+        model = cls(**args)
+        if pretrained:
+            model.load_ckpt(fetch_pe_checkpoint(name, checkpoint_path))
+        
+        return model
 
     @classmethod
     def available_configs(cls):
@@ -547,6 +555,7 @@ class VisionTransformer(nn.Module):
         
         return x
 
+
 class TextTransformer(nn.Module):
     def __init__(
         self,
@@ -619,8 +628,15 @@ class TextTransformer(nn.Module):
         mask = mx.triu(mask, k=1)
         return mask
     
+    def sanitize_weights(self, state_dict: dict):
+        for key, value in state_dict.items():
+            if "conv1" in key:
+                state_dict[key] = value.transpose(0, 2, 3, 1)
+        return state_dict
+
     def load_ckpt(self, ckpt_path: str, verbose: bool = True):
         _sd = mx.load(ckpt_path)
+        _sd = self.sanitize_weights(_sd)
         if "state_dict" in _sd:
             _sd = _sd["state_dict"]
         elif "weights" in _sd:
@@ -629,13 +645,12 @@ class TextTransformer(nn.Module):
         # for backwards compatibility
         _sd = {k.replace("module.", ""): v for k, v in _sd.items()}
         
-        m, u = self.load_weights(_sd, strict=False)
-        
-        if verbose or (m or u):
-            logger.info(f"Missing keys for loading text encoder: {m}")
-            logger.info(f"Unexpected keys for loading text encoder: {u}")
-            print(f"Missing keys for loading text encoder: {m}")
-            print(f"Unexpected keys for loading text encoder: {u}")
+        try:
+            self.load_weights(_sd, strict=False)
+        except Exception as e:
+            logger.info(f"Exception while loading weights for text encoder: {e}")
+            print(f"Exception while loading weights for text encoder: {e}")
+            raise ValueError("Error loading weights for text encoder") from e
     
     def text_global_pool(
         self, x, text: Optional[mx.array] = None, pool_type: str = "argmax"
@@ -706,17 +721,11 @@ class CLIP(TextTransformer):
     
     def encode_text(self, text, normalize: bool = False):
         x = super().__call__(text)
-        breakpoint()
         if normalize:
             x = x / (mx.linalg.norm(x, ord=2, axis=-1, keepdims=True) + 1e-12)
         return x
 
-    def sanitize_weights(self, state_dict: dict):
-        for key, value in state_dict.items():
-            if "conv1" in key:
-                state_dict[key] = value.transpose(0, 2, 3, 1)
-        return state_dict
-
+    
     def __call__(
         self,
         image: Optional[mx.array] = None,
@@ -744,7 +753,7 @@ class CLIP(TextTransformer):
         
         model = cls(PE_VISION_CONFIG[name], PE_TEXT_CONFIG[name])
         if pretrained:
-            model.load_ckpt()
+            model.load_ckpt(fetch_pe_checkpoint(name, checkpoint_path))
         
         return model
     

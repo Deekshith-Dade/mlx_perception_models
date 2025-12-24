@@ -6,7 +6,7 @@ from typing import Optional
 from huggingface_hub import hf_hub_download
 
 def fetch_pe_checkpoint(name: str, path: Optional[str] = None):
-    path = path or f"hf://facebook/{name}:{name}.pt"
+    path = path or f"hf://mlx-community/{name}:model.safetensors"
 
     if path.startswith("hf://"):
         path = path[len("hf://"):]
