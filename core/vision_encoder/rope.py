@@ -3,7 +3,7 @@ from typing import Literal, Optional, Union
 
 import mlx.core as mx
 import mlx.nn as nn
-from einops import einsum, rearrange, repeat
+from mlx.core import einsum
 
 def exists(val):
     return val is not None
@@ -14,12 +14,15 @@ def default(val, d):
 # broadcast
 
 def rotate_half(x):
-    x = rearrange(x, "... (d r) -> ... d r", r=2)
+    full_shape = x.shape
+    d = full_shape[-1]
+    x = x.reshape(*full_shape[:-1], d//2, 2)
     x1, x2 = x[..., 0], x[..., 1]
     x = mx.stack((-x2, x1), axis=-1)
-    return rearrange(x, "... d r -> ... (d r)")
+    x = x.reshape(*full_shape)
+    return x
 
-def apply_roatary_emb(freqs, t, start_index=0, scale=1.0, seq_dim=-2):
+def apply_rotary_emb(freqs, t, start_index=0, scale=1.0, seq_dim=-2):
     dtype = t.dtype
     
     if t.ndim == 3:
@@ -127,11 +130,14 @@ class RotaryEmbedding(nn.Module):
         
         freqs = self.freqs
         
-        freqs = einsum("..., f -> ... f", t.type(self.freqs.dtype), freqs)
-        freqs = repeat(freqs, "... f -> ... (f r)", r=2)
+        freqs = einsum("..., f -> ... f", t.astype(self.freqs.dtype), freqs)
+        # freqs = repeat(freqs, "... f -> ... (f r)", r=2)
+        freqs = mx.repeat(freqs, repeats=2, axis=-1)
         
         if should_cache:
             self._cached_freqs = freqs
+        
+        return freqs
 
 class Rope2D:
     def __init__(self, dim, use_cls_token=False):
@@ -140,7 +146,7 @@ class Rope2D:
         self.grid_size = None
         self.freq = None
     
-    def init_tensors(self):
+    def init_arrays(self):
         self.rope = RotaryEmbedding(self.dim // 2)
     
     def update_grid(self, grid_h, grid_w):
@@ -162,11 +168,11 @@ class Rope2D:
                 freq = mx.concat(
                     [mx.zeros((1, freq.shape[-1])), freq], axis=0
                 )
-            self.freq = freq
+            self.freq = freq[None, ...]
     
     def __call__(self, q, k):
-        q = apply_roatary_emb(self.freq[:, None, :, :], q)
-        k = apply_roatary_emb(self.freq[:, None, :, :], k)
+        q = apply_rotary_emb(self.freq[:, None, :, :], q)
+        k = apply_rotary_emb(self.freq[:, None, :, :], k)
         
         return q, k
         

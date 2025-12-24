@@ -266,7 +266,7 @@ class SimpleTokenizer(object):
             [self.sot_token_id] + self.encode(text) + [self.eot_token_id]
             for text in texts
         ]
-        result = mx.zeros(len(all_tokens), context_length, dtype=mx.int64)
+        result = mx.zeros((len(all_tokens), context_length), dtype=mx.int64)
 
         for i, tokens in enumerate(all_tokens):
             if len(tokens) > context_length:
@@ -286,7 +286,7 @@ def random_mask_tokenize(
     shuffle: bool = False,
 ):
     all_tokens = [encode_fn(text) for text in texts]
-    result = mx.zeros(len(all_tokens), context_length, dtype=mx.int64)
+    result = mx.zeros((len(all_tokens), context_length), dtype=mx.int64)
 
     for i, tokens in enumerate(all_tokens):
         tokens = mx.array(tokens)
@@ -314,7 +314,7 @@ def simple_mask_tokenize(
     encode_fn: Callable,
 ):
     all_tokens = [encode_fn(text) for text in texts]
-    result = mx.zeros(len(all_tokens), context_length, dtype=mx.int64)
+    result = mx.zeros((len(all_tokens), context_length), dtype=mx.int64)
 
     for i, tokens in enumerate(all_tokens):
         num_tokens = len(tokens)
