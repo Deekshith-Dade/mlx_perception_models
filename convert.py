@@ -59,7 +59,7 @@ def main():
     # model_name = "PE-Core-L14-336"
     model_names = ["PE-Core-T16-384", "PE-Core-S16-384", "PE-Core-B16-224", "PE-Core-L14-336", "PE-Core-G14-448"]
     for model_name in model_names:
-        save_model_as_safetensors(model_name)
+        save_model_as_safetensors(model_name, save_path="pe_models")
     
     
 
