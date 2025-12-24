@@ -3,6 +3,20 @@ from dataclasses import dataclass
 from typing import Optional
 
 
+from huggingface_hub import hf_hub_download
+
+def fetch_pe_checkpoint(name: str, path: Optional[str] = None):
+    path = path or f"hf://facebook/{name}:{name}.pt"
+
+    if path.startswith("hf://"):
+        path = path[len("hf://"):]
+        repo, file = path.split(":")
+
+        return hf_hub_download(repo, file)
+    else:
+        return path
+
+
 @dataclass
 class PEConfig:
     """ Vision Tower Config. """

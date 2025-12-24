@@ -33,16 +33,66 @@ class MLP(nn.Module):
         mlp_width: int,
     ):
         super().__init__()
-        self.fc1 = nn.Linear(embed_dim, mlp_width)
-        self.act = nn.GELU()
-        self.fc2 = nn.Linear(mlp_width, embed_dim)
+        self.c_fc = nn.Linear(embed_dim, mlp_width)
+        self.gelu = nn.GELU()
+        self.c_proj = nn.Linear(mlp_width, embed_dim)
     
     def __call__(self, x):
-        x = self.fc1(x)
-        x = self.act(x)
-        x = self.fc2(x)
+        x = self.c_fc(x)
+        x = self.gelu(x)
+        x = self.c_proj(x)
         return x
         
+class MHA(nn.Module):
+    def __init__(
+        self,
+        embed_dim: int,
+        num_heads: int,
+    ):
+        super().__init__()
+        self.embed_dim = embed_dim
+        
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        assert (
+            self.head_dim * num_heads == self.embed_dim
+        ), "embed_dim must be divisible by num_heads"
+        
+        self.in_proj_weight = mx.zeros((3 * embed_dim, embed_dim))
+        self.in_proj_bias = mx.zeros((3 * embed_dim,))
+        self.out_proj = nn.Linear(embed_dim, embed_dim, bias=True)
+
+        self.scale = self.head_dim ** -0.5
+    
+    def __call__(self, q: mx.array, k: mx.array, v: mx.array, attn_mask: Optional[mx.array] = None):
+        B, L, D = q.shape
+        _, S, _ = k.shape
+        H = self.num_heads
+        Hd = self.head_dim
+        if q is k and k is v:
+            qkv = q @ self.in_proj_weight.T + self.in_proj_bias
+            q_proj, k_proj, v_proj = mx.split(qkv, 3, axis=-1)
+        else:
+            Wq, Wk, Wv = mx.split(self.in_proj_weight, 3, axis=0)
+            bq, bk, bv = mx.split(self.in_proj_bias, 3, axis=0)
+            
+            q_proj = q @ Wq.T + bq
+            k_proj = k @ Wk.T + bk
+            v_proj = v @ Wv.T + bv
+        
+        q_proj = q_proj.reshape((B, L, H, Hd)).transpose(0, 2, 1, 3)
+        k_proj = k_proj.reshape((B, S, H, Hd)).transpose(0, 2, 1, 3)
+        v_proj = v_proj.reshape((B, S, H, Hd)).transpose(0, 2, 1, 3)
+        
+        out = mx.fast.scaled_dot_product_attention(
+            q_proj, k_proj, v_proj, scale=self.scale, mask=attn_mask
+        )
+        
+        out = out.transpose(0, 2, 1, 3).reshape((B, L, D))
+        
+        out = self.out_proj(out)
+        return out
+
 class AttentionPooling(nn.Module):
     def __init__(
         self,
@@ -63,9 +113,10 @@ class AttentionPooling(nn.Module):
         ), "embed_dim must be divisible by num_heads"
 
         self.probe = mx.random.normal((1, num_probe, self.embed_dim))
-        self.attn = nn.MultiHeadAttention(
-            self.embed_dim, self.num_heads 
-        )
+        # self.attn = nn.MultiHeadAttention(
+        #     self.embed_dim, self.num_heads 
+        # )
+        self.attn = MHA(self.embed_dim, self.num_heads)
 
         self.layernorm = norm_layer(self.embed_dim)
         self.mlp_width = int(self.embed_dim * mlp_ratio)
@@ -160,7 +211,8 @@ class ResidualAttentionBlock(nn.Module):
         if rope:
             self.attn = SelfAttention(d_model, n_head, rope=rope)
         else:
-            self.attn = nn.MultiHeadAttention(d_model, n_head)
+            # self.attn = nn.MultiHeadAttention(d_model, n_head)
+            self.attn = MHA(d_model, n_head)
         
         self.ls_1 = (
             LayerScale(d_model, ls_init_value)
@@ -189,12 +241,12 @@ class ResidualAttentionBlock(nn.Module):
     ):
         if attn_mask is not None:
             if not attn_mask.dtype == mx.bool_:
-                attn_mask = attn_mask.astype(mx.bool_)
+                attn_mask = attn_mask.astype(q_x.dtype)
         
         if isinstance(self.attn, SelfAttention):
             return self.attn(q_x, attn_mask=attn_mask)
         else:
-            return self.attn(q_x, q_x, q_x, mask=attn_mask)
+            return self.attn(q_x, q_x, q_x, attn_mask=attn_mask)
         
     def __call__(
         self,
@@ -487,7 +539,7 @@ class VisionTransformer(nn.Module):
         return x
     
     def __call__(self, x: mx.array, **kwargs):
-        x = self.forward_features(x, **kwargs)
+        x = self.forward_features(x, norm=True, **kwargs)
         x = self._pool(x)
         
         if self.proj_dim is not None:
@@ -543,9 +595,9 @@ class TextTransformer(nn.Module):
         self.ln_final = norm_layer(width) if use_ln_post else nn.Identity()
         
         if no_causal_mask:
-            self.attn_mask = None
+            self._attn_mask = None
         else:
-            self.attn_mask = self.build_causal_mask()
+            self._attn_mask = self.build_causal_mask()
         
         if pool_type == "attn" or pool_type == "attn_eos":
             self.attn_pool = AttentionPooling(
@@ -604,7 +656,7 @@ class TextTransformer(nn.Module):
         seq_len = text.shape[1]
         
         x = self.token_embedding(text)
-        attn_mask = self.attn_mask
+        attn_mask = self._attn_mask
         if attn_mask is not None:
             attn_mask = attn_mask[:seq_len, :seq_len]
         
@@ -642,7 +694,6 @@ class CLIP(TextTransformer):
         x = self.visual(image)
         if normalize:
             x = x / (mx.linalg.norm(x, ord=2, axis=-1, keepdims=True) + 1e-12)
-        breakpoint()
         return x
     
     def encode_video(self, video, normalize: bool = False): # b n c h w
@@ -655,9 +706,16 @@ class CLIP(TextTransformer):
     
     def encode_text(self, text, normalize: bool = False):
         x = super().__call__(text)
+        breakpoint()
         if normalize:
             x = x / (mx.linalg.norm(x, ord=2, axis=-1, keepdims=True) + 1e-12)
         return x
+
+    def sanitize_weights(self, state_dict: dict):
+        for key, value in state_dict.items():
+            if "conv1" in key:
+                state_dict[key] = value.transpose(0, 2, 3, 1)
+        return state_dict
 
     def __call__(
         self,
