@@ -15,7 +15,7 @@ from core.transformer import (
 )
 
 from core.utils import InitArgs
-from core.vision_encoder.pe import VisionTransformeras as PE_VisionTransformer
+from core.vision_encoder.pe import VisionTransformer as PE_VisionTransformer
 from core.vision_projector.mlp import MLPProjector
 
 logger = logging.getLogger(__name__)
@@ -90,16 +90,16 @@ class LMTransformer(BaseTransformer):
         self.freeze_vision_model = args.freeze_language_model
         self.freeze_language_model = args.freeze_language_model
         
-    def train(self, mode: bool = True):
-        super().train(mode=mode)
-        for name, param in self.parameters():
-            if "vision_model" in name:
-                param.requires_grad = mode and not self.freeze_vision_model
-            elif "vision_projector" in name:
-                param.requires_grad = mode
-            else:
-                param.requires_grad = mode and not self.freeze_language_model
-        return self
+    # def train(self, mode: bool = True):
+    #     super().train(mode=mode)
+    #     for name, param in self.parameters():
+    #         if "vision_model" in name:
+    #             param.requires_grad = mode and not self.freeze_vision_model
+    #         elif "vision_projector" in name:
+    #             param.requires_grad = mode
+    #         else:
+    #             param.requires_grad = mode and not self.freeze_language_model
+    #     return self
     
     def __call__(
         self,
@@ -110,7 +110,7 @@ class LMTransformer(BaseTransformer):
         images: Optional[mx.array] = None,
         image_pos_index: Optional[mx.array] = None,
         loss_mask: Optional[mx.array] = None,
-        aspect_ratios: Optional[mx.aray] = None,
+        aspect_ratios: Optional[mx.array] = None,
         num_chunks: List[int] = [1],
         media_type: List[str] = ["multi_image"],
         attn_impl: str = "sdpa",
@@ -156,14 +156,27 @@ class LMTransformer(BaseTransformer):
         self,
         h_tok: mx.array,
         h_img: List[mx.array],
-        iamge_pos_index: mx.array,
+        image_pos_index: mx.array,
         num_chunks: List[int],
         media_type: List[str]
     ):
         cumulative_indices=list(itertools.accumulate(num_chunks, initial=0))
-
+        # Get indices for non-text samples
         non_text_indices = [
-            
+            idx
+            for start, end, m_type in zip(
+                cumulative_indices[:-1], cumulative_indices[1:], media_type
+            )
+            if m_type != "text"
+            for idx in range(start, end)
         ]
+        img_indices_B, img_indices_L = mx.where(image_pos_index >= 0)
+        valid_index_filter = img_indices_L < h_tok.shape[1]
+        img_indices_L = img_indices_L[valid_index_filter]
+        img_indices_B = img_indices_B[valid_index_filter]
+        h_tok[img_indices_B, img_indices_L] = h_img[non_text_indices].flatten(0, 1)[
+            valid_index_filter
+        ]
+        return h_tok
 
 

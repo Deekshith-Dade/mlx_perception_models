@@ -191,7 +191,7 @@ class RMSNorm(nn.Module):
     def __init__(self, dim: int, eps: float = 1e-6):
         super().__init__()
         self.eps = eps
-        self.weight = nn.Parameter(mx.ones((dim, )))
+        self.weight = mx.ones((dim,))
 
     def _norm(self, x: mx.array):
         return x * mx.rsqrt((x * x).mean(-1, keepdim=True) + self.eps)
@@ -376,7 +376,7 @@ class TransformerBlock(nn.Module):
         )
 
         self.feed_forward = FeedForward(
-            dims=args.dim,
+            dim=args.dim,
             hidden_dim=4 * args.dim,
             multiple_of=args.multiple_of,
             ffn_dim_multiplier=args.ffn_dim_multiplier
@@ -411,7 +411,7 @@ class BaseTransformer(nn.Module):
         super().__init__()
         self.dim = args.dim
         self.init_base_std = args.init_base_std
-        self.init_std_factor = InitStdFactor[args.init_std_factor]
+        self.init_std_factor = InitStdFactor(args.init_std_factor)
         self.max_seq_len = args.max_seqlen
         self.rope_embeddings = RotaryEmbedding(
             theta=args.rope_theta,

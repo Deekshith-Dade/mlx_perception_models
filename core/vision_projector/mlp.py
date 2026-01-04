@@ -51,14 +51,12 @@ class MLPProjector(BaseProjector):
                 input_dims=input_size,
                 output_dims=output_size,
                 bias=True,
-                dtype=mx.float32
             ),
             nn.GELU(),
             nn.Linear(
                 input_dims=input_size,
                 output_dims=output_size,
                 bias=True,
-                dtype=mx.float32
             ),
         )
 

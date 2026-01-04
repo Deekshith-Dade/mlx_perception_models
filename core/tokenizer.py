@@ -88,3 +88,20 @@ class TikTokenTokenizer(Tokenizer):
     
     def decode(self, tokens: List[int]):
         return self.tkt_model.decode(tokens) 
+    
+    def get_token_offsets(
+        self, text: str, tokens: Optional[List[int]] = None
+    ) -> Tuple[List[str], List[int]]:
+        if tokens is not None:
+            token_bytes = self.tkt_model.decode_tokens_bytes(tokens)
+        else:
+            token_bytes = self.tkt_model.decode_tokens_bytes(
+                self.tkt_model.encode(text, allowed_special="all")
+            )
+
+        text_len, offsets = 0, []
+        for token in token_bytes:
+            offsets.append(max(0, text_len - (0x80 <= token[0] < 0xC0)))
+            text_len += sum(1 for c in token if not 0x80 <= c < 0xC0)
+        substrs = [text[s:e] for s, e in zip(offsets, offsets[1:] + [None])]
+        return substrs, offsets
