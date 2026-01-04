@@ -36,12 +36,22 @@ class MLPProjector(BaseProjector):
         self.adaptive_avg_pool = AdaptiveAvgPooling(pooling_ratio=args.pooling_ratio)
         self.remove_vision_class_token = args.remove_vision_class_token
 
-    def init_tensors(self):
-        self.projector[0].weight = self.init_method(self.projector[0].weight)
-        self.projector[0].bias = self.init_method(self.projector[0].bias)
-        self.projector[2].weight = self.init_method(self.projector[2].weight)
-        self.projector[2].bias = self.init_method(self.projector[2].bias)
+    def init_arrays(self):
+        self.projector.layers[0].weight = self.init_method(self.projector.layers[0].weight)
+        self.projector.layers[0].bias = self.init_method(self.projector.layers[0].bias)
+        self.projector.layers[2].weight = self.init_method(self.projector.layers[2].weight)
+        self.projector.layers[2].bias = self.init_method(self.projector.layers[2].bias)
     
+    def sanitize_weights(self, state_dict):
+        new_state_dict = {}
+        for key, value in state_dict.items():
+            if "vision_projector.projector" in key:
+                n_key = key.replace("vision_projector.projector", "vision_projector.projector.layers")
+                new_state_dict[n_key] = value
+            else:
+                new_state_dict[key] = value
+        return new_state_dict
+
     def setup_projector(self, args):
         self.init_method = get_init_fn(args.mlp_init, args.dim, init_depth=None)
         input_size = args.vision_model["width"]

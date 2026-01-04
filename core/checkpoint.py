@@ -39,11 +39,21 @@ def load_consolidated_checkpoint(
             st_dict.update(part)
     
     model.vision_projector.init_arrays()
-    model.vision_model.init_tensors()
+    model.vision_model.init_arrays()
     model.rope_embeddings.reset_parameters()
 
+    breakpoint()
     if vision_model_path is not None:
         model.vision_model.load_ckpt(vision_model_path)
+    
+    st_dict = model.vision_projector.sanitize_weights(st_dict)
+    st_dict = model.vision_model.sanitize_weights(st_dict)
+    try:
+        model.load_weights(st_dict, strict=False)
+    except Exception as e:
+        # print(f"Exception while loading weights for text encoder: {e}")
+        print(f"Exception while loading weights for text encoder: {e}")
+        raise ValueError("Error loading weights for text encoder") from e
     
     
     

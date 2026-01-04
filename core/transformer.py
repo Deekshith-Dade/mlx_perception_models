@@ -122,9 +122,9 @@ class RotaryEmbedding(nn.Module):
             self.high_freq_wavelen = old_context_len / high_freq_factor
             assert self.low_freq_wavelen >= self.high_freq_wavelen
     
-    def reset_paramters(self):
+    def reset_parameters(self):
         self._freqs_cis = self.precompute_freqs_cis(
-            dim=self.head_dim, end=self.max_seqlen, theta=self.that
+            dim=self.head_dim, end=self.max_seqlen, theta=self.theta
         )
 
     def apply_scaling(self, freqs):
@@ -382,7 +382,7 @@ class TransformerBlock(nn.Module):
             ffn_dim_multiplier=args.ffn_dim_multiplier
         )
 
-        self.attnention_norm = RMSNorm(args.dim, eps=args.norm_eps)
+        self.attention_norm = RMSNorm(args.dim, eps=args.norm_eps)
         self.ffn_norm = RMSNorm(args.dim, args.norm_eps)
     
     def __call__(
@@ -394,7 +394,7 @@ class TransformerBlock(nn.Module):
         attn_impl: str = "sdpa",
     ):
         h = x + self.attention(
-            self.attnention_norm(x),
+            self.attention_norm(x),
             freq_cis,
             tok_idx=tok_idx,
             mask=mask,

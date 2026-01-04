@@ -421,9 +421,16 @@ class VisionTransformer(nn.Module):
 
         if self.proj_dim is not None:
             self.proj = init_scale * mx.random.normal((self.width, self.proj_dim))
-    
+
+    def sanitize_weights(self, state_dict: dict):
+        for key, value in state_dict.items():
+            if "conv1" in key:
+                state_dict[key] = value.transpose(0, 2, 3, 1)
+        return state_dict
+
     def load_ckpt(self, ckpt_path: str, verbose: bool = True):
         _sd = mx.load(ckpt_path)
+        _sd = self.sanitize_weights(_sd)
         if "state_dict" in _sd:
             _sd = _sd["state_dict"]
         elif "weights" in _sd:

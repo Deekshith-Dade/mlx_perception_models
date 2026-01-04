@@ -7,6 +7,8 @@ import time
 from dataclasses import dataclass, field
 from typing import List, Optional
 
+from core.checkpoint import load_consolidated_checkpoint
+
 logging.basicConfig(level=logging.INFO)
 
 import mlx.core as mx
@@ -130,7 +132,7 @@ def load_consolidated_model_and_tokenizer(ckpt):
     # Build model and load the consolidate checkpoints
     model_args = dataclass_from_dict(LMTransformerArgs, config.model, strict=False)
     model = LMTransformer(model_args)
-    # load_consolidated_checkpoint(model, ckpt_path)
+    load_consolidated_checkpoint(model, ckpt_path)
     model.eval()
 
     return model, tokenizer, config
