@@ -30,7 +30,7 @@ class DropPath(nn.Module):
         self.drop_prob = drop_prob
         self.scale_by_keep = scale_by_keep
 
-    def forward(self, x):
+    def __call__(self, x):
         return drop_path(x, self.drop_prob, self.training, self.scale_by_keep)
 
     def extra_repr(self):

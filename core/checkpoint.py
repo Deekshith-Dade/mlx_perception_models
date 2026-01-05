@@ -42,7 +42,6 @@ def load_consolidated_checkpoint(
     model.vision_model.init_arrays()
     model.rope_embeddings.reset_parameters()
 
-    breakpoint()
     if vision_model_path is not None:
         model.vision_model.load_ckpt(vision_model_path)
     

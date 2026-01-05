@@ -514,6 +514,8 @@ class VisionTransformer(nn.Module):
             return x.mean(axis=1)
         elif self.pool_type == "attn":
             return self.attn_pool(x).squeeze(1)
+        elif self.pool_type == "none":
+            return x
         else:
             raise NotImplementedError
     

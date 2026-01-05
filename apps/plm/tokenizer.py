@@ -76,7 +76,7 @@ class Llama3Tokenizer(TikTokenTokenizer):
         substrs = (
             substr
             for i in range(0, len(s), TIKTOKEN_MAX_ENCODE_CHARS)
-            for substr in self._split_whitespaces_or_nowhitespaces(
+            for substr in self._split_whitespaces_or_nonwhitespaces(
                 s[i: i + TIKTOKEN_MAX_ENCODE_CHARS], MAX_NO_WHITESPACE_CHARS
             )
         )
@@ -240,7 +240,7 @@ class PLMTokenizer(Llama3Tokenizer):
         media: Optional[mx.array] = None,
     ):
         if media is not None:
-            width, height = media.size(-2), media.size(-1)
+            width, height = media.shape[-2], media.shape[-1]
             num_patches = int(
                 (width // self.patch_size // self.pooling_ratio)
                 * (height // self.patch_size // self.pooling_ratio)

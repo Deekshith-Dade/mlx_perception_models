@@ -120,7 +120,7 @@ class LMTransformer(BaseTransformer):
         h = self.tok_embeddings(token_values) # B, seqlen, z
 
         if images is not None:
-            h_img = self.vision_model(images, strip_cls_token=True)
+            h_img = self.vision_model(images.transpose(0, 2, 3, 1), strip_cls_token=True)
             h_img = self.vision_projector(h_img)
 
             h = self.stitch_images_into_text(
@@ -160,6 +160,7 @@ class LMTransformer(BaseTransformer):
         num_chunks: List[int],
         media_type: List[str]
     ):
+        assert h_tok.shape[0] == 1, "Only supports batch size one for now"
         cumulative_indices=list(itertools.accumulate(num_chunks, initial=0))
         # Get indices for non-text samples
         non_text_indices = [
@@ -170,13 +171,16 @@ class LMTransformer(BaseTransformer):
             if m_type != "text"
             for idx in range(start, end)
         ]
-        img_indices_B, img_indices_L = mx.where(image_pos_index >= 0)
-        valid_index_filter = img_indices_L < h_tok.shape[1]
-        img_indices_L = img_indices_L[valid_index_filter]
-        img_indices_B = img_indices_B[valid_index_filter]
-        h_tok[img_indices_B, img_indices_L] = h_img[non_text_indices].flatten(0, 1)[
-            valid_index_filter
-        ]
-        return h_tok
+        # img_indices_B, img_indices_L = mx.where(image_pos_index >= 0)
+        # valid_index_filter = img_indices_L < h_tok.shape[1]
+        # img_indices_L = img_indices_L[valid_index_filter]
+        # img_indices_B = img_indices_B[valid_index_filter]
+        # h_tok[img_indices_B, img_indices_L] = h_img[non_text_indices].flatten(0, 1)[
+        #     valid_index_filter
+        # ]
+        out = h_tok.squeeze()
+        out[image_pos_index[0] >= 0] = h_img.flatten(0, 1)
+        
+        return out[None]
 
 

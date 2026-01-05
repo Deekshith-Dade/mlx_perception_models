@@ -97,7 +97,22 @@ def batch_prompts(prompts, max_elements, lengths=None):
 
     return batches
 
-
+class KVCache(nn.Module):
+    def __init__(self, bsz, seqlen, n_heads, head_dim, dtype):
+        super().__init__()
+        shape = (bsz, seqlen, n_heads, head_dim)
+        self.k_cache = mx.zeros(shape, dtype=dtype)
+        self.v_cache = mx.zeros(shape, dtype=dtype)
+        self.offset = 0
+    
+    def reset(self):
+        self.k_cache = mx.zeros_like(self.k_cache)
+        self.v_cache = mx.zeros_like(self.v_cache)
+        self.offset = 0
+    
+    def update(self, k_val, v_val, tok_idx):
+        # input_pos: [B], k_val: [B, S, H, D]
+        pass
 
 def load_consolidated_model_and_tokenizer(ckpt):
     if os.path.exists(ckpt):

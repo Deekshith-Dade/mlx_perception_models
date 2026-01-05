@@ -117,6 +117,7 @@ class RotaryEmbedding(nn.Module):
         self.scale_factor = scale_factor
         self.low_freq_factor = low_freq_factor
         self.high_freq_factor = high_freq_factor
+        self.old_context_len = old_context_len
         if scale_factor != 1:
             self.low_freq_wavelen = old_context_len / low_freq_factor
             self.high_freq_wavelen = old_context_len / high_freq_factor
@@ -154,7 +155,8 @@ class RotaryEmbedding(nn.Module):
         end: int,
         theta: float = 10000.0
     ):
-        freqs = (1 / (theta ** mx.arange(0, dim, 2)[:dim // 2].astype(mx.float32) / dim))
+        # freqs = (1.0 / (theta ** mx.arange(0, dim, 2)[:dim // 2].astype(mx.float32) / dim))
+        freqs = 1.0 / (theta ** (mx.arange(0, dim, 2)[: (dim // 2)].astype(mx.float32) / dim))
         freqs = self.apply_scaling(freqs)
 
         t = mx.arange(end)
@@ -194,12 +196,12 @@ class RMSNorm(nn.Module):
         self.weight = mx.ones((dim,))
 
     def _norm(self, x: mx.array):
-        return x * mx.rsqrt((x * x).mean(-1, keepdim=True) + self.eps)
+        return x * mx.rsqrt((x * x).mean(-1, keepdims=True) + self.eps)
 
-    def forward(self, x: mx.array):
+    def __call__(self, x: mx.array):
         # x = probe.log_stats(x, "resid")
-        output = self._norm(x.float())
-        return (output * self.weight.float()).type_as(x)
+        output = self._norm(x.astype(mx.float32))
+        return (output * self.weight.astype(mx.float32)).astype(x.dtype)
 
     def reset_parameters(self):
         torch.nn.init.ones_(self.weight)  # type: ignore
@@ -267,14 +269,14 @@ class Attention(nn.Module):
         # B, S, D
         bsz, seq_len, dim = x.shape
         xq = self.wq(mx.reshape(x, x.shape)) # TODO: WHY?
-        xk = self.wq(mx.reshape(x, x.shape))
-        xv = self.wq(mx.reshape(x, x.shape))
+        xk = self.wk(mx.reshape(x, x.shape))
+        xv = self.wv(mx.reshape(x, x.shape))
         
         output_shape = xq.shape
         # B S D -> B S H D
-        xq = xq.view(bsz, seq_len, self.n_heads, self.head_dim)
-        xk = xk.view(bsz, seq_len, self.n_kv_heads, self.head_dim)
-        xv = xv.view(bsz, seq_len, self.n_kv_heads, self.head_dim)
+        xq = xq.reshape(bsz, seq_len, self.n_heads, self.head_dim)
+        xk = xk.reshape(bsz, seq_len, self.n_kv_heads, self.head_dim)
+        xv = xv.reshape(bsz, seq_len, self.n_kv_heads, self.head_dim)
 
         xq, xk = apply_rotary_emb(xq, xk, 1, freq_cis[0:seq_len])
 
@@ -282,8 +284,8 @@ class Attention(nn.Module):
         if hasattr(self, "kv_cache"):
             xk, xv = self.kv_cache.update(xk, xv, tok_idx)
         
-        # xk = repeat_kv(xk, self.heads_per_group, dim=2)
-        # xv = repeat_kv(xv, self.heads_per_group, dim=2)
+        xk = repeat_kv(xk, self.heads_per_group, dim=2)
+        xv = repeat_kv(xv, self.heads_per_group, dim=2)
 
         if attn_impl == "sdpa":
             xq, xk, xv = map(lambda e: e.transpose(0, 2, 1, 3), (xq, xk, xv))
@@ -293,6 +295,7 @@ class Attention(nn.Module):
                 xq,
                 xk,
                 xv,
+                scale=1.0 / math.sqrt(self.head_dim),
                 mask=mask
             )
         else:
@@ -343,7 +346,7 @@ class FeedForward(nn.Module):
             bias=False,
         )
     
-    def forward(self, x: mx.array) -> mx.array:
+    def __call__(self, x: mx.array) -> mx.array:
         # B S D
         x1 = self.w1(x)
         x3 = self.w3(x)
