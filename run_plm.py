@@ -65,7 +65,7 @@ def generate(
     print("==============================================")
 
 media_path = "br.jpg"
-question = "Describe the image in details."
+question = "Describe clearly, what you are seeing?"
 
 print("Generating with 4 tiles + 1 tumb...")
 generate(media_path=media_path, question=question, number_of_tiles=4, media_type="image")

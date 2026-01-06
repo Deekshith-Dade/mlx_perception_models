@@ -155,5 +155,5 @@ class LMGenerator:
             current_token = next_token
         
         generation = self.tokenizer.decode(generated_tokens)
-        generation.replace("<|eot_id|>", "").replace("<|end_of_text|>", "")
+        generation = generation.replace("<|eot_id|>", "").replace("<|end_of_text|>", "")
         return generation

@@ -298,6 +298,7 @@ class Attention(nn.Module):
                 scale=1.0 / math.sqrt(self.head_dim),
                 mask=mask
             )
+            output = output.transpose(0, 2, 1, 3)
         else:
             raise NotImplementedError(
                 f"Attention implementation {attn_impl} not supported"
