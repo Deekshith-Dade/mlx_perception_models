@@ -121,7 +121,7 @@ def load_consolidated_model_and_tokenizer(ckpt):
         try:
             print(f"Downloading {ckpt} from Hugging Face Hub...")
             ckpt_path = snapshot_download(ckpt)
-            ckpt_path = os.path.join(ckpt_path, "original")
+            ckpt_path = os.path.join(ckpt_path, "")
             print(f"Downloaded to: {ckpt_path}")
         except Exception as e:
             # Handle exceptions, such as model not found on HF Hub

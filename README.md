@@ -1,6 +1,6 @@
-# MLX Perception Encoder (PE-Core)
+# MLX Perception Models
 
-This repository contains **MLX ports** of Meta's **Perception Encoder (PE-Core)** models, optimized for fast inference on Apple Silicon. The models are converted from PyTorch to MLX format and are hosted on the [mlx-community](https://huggingface.co/mlx-community) on Hugging Face.
+This repository contains **MLX ports** of Meta's **Perception Encoder (PE-Core)** and **Perception Language Model (Perception-LM)** models, optimized for fast inference on Apple Silicon. The models are converted from PyTorch to MLX format and are hosted on the [mlx-community](https://huggingface.co/mlx-community) on Hugging Face.
 
 > **📚 Original Repository:** For comprehensive documentation, benchmarks, training details, and the full model family (PE-Lang, PE-Spatial, PE-Audio-Visual), visit the original [facebookresearch/perception_models](https://github.com/facebookresearch/perception_models) repository.
 
@@ -17,6 +17,8 @@ This repository contains **MLX ports** of Meta's **Perception Encoder (PE-Core)*
 
 ## 📦 Available Models
 
+### Perception Encoder (PE-Core) Models
+
 All PE-Core models are available on [mlx-community](https://huggingface.co/mlx-community) and are automatically downloaded when you load them:
 
 | Model | Image Size | Patch Size | Vision Layers | Vision Width | Params | Use Case |
@@ -26,6 +28,16 @@ All PE-Core models are available on [mlx-community](https://huggingface.co/mlx-c
 | `PE-Core-B16-224` | 224×224 | 16 | 12 | 768 | Base | Balanced |
 | `PE-Core-L14-336` | 336×336 | 14 | 24 | 1024 | Large | High quality |
 | `PE-Core-G14-448` | 448×448 | 14 | 50 | 1536 | Giant | Best quality |
+
+### Perception Language Model (Perception-LM) Models
+
+All Perception-LM models are available on [mlx-community](https://huggingface.co/mlx-community) and are automatically downloaded when you load them:
+
+| Model | Params | Use Case |
+|-------|--------|----------|
+| `mlx-community/Perception-LM-1B` | 1B | Fast inference, mobile |
+| `mlx-community/Perception-LM-3B` | 3B | Balanced performance |
+| `mlx-community/Perception-LM-8B` | 8B | High quality, detailed understanding |
 
 ---
 
@@ -88,15 +100,53 @@ print("Text probs:", text_probs)
 
 ---
 
+## 📖 About Perception Encoder
+
+Perception Encoder (PE) is Meta's state-of-the-art family of vision encoders developed by Facebook Research. The PE-Core models are CLIP-style encoders that excel at:
+
+- **Zero-shot Image Classification** — Classify images without task-specific training
+- **Image-Text Retrieval** — Find images matching text queries and vice versa
+- **Video Understanding** — Strong performance on video classification benchmarks
+- **Foundation for VLMs** — Powers the Perception Language Model (PLM)
+
+---
+
+## 🤖 Running Perception-LM Models
+
+**Perception-LM models are now working!** These vision-language models combine the PE-Core vision encoder with a language model to enable detailed visual understanding and image-to-text generation.
+
+To run Perception-LM models, use the `run_plm.py` script. The models are available on [mlx-community](https://huggingface.co/mlx-community) and will be automatically downloaded when you run the script.
+
+```bash
+python run_plm.py
+```
+
+Alternatively, you can explore Perception-LM models interactively using the Jupyter notebook demo at `apps/plm/notebook_demos/image_grounding.ipynb`. This notebook provides examples of image grounding and visual question answering with Perception-LM models.
+
+You can modify `run_plm.py` to:
+- Change the model checkpoint (e.g., `mlx-community/Perception-LM-3B` or `mlx-community/Perception-LM-8B`)
+- Specify different images and questions
+- Adjust generation parameters (temperature, top_p, top_k)
+- Configure the number of tiles for high-resolution image processing
+
+The script supports:
+- **Image Understanding** — Detailed image descriptions and visual question answering
+- **High-Resolution Processing** — Multi-tile processing for large images
+- **Fast Inference** — Optimized for Apple Silicon via MLX
+
+---
+
 ## 🔧 Converting Models Locally
 
-If you want to convert models from the original PyTorch checkpoints to MLX format locally, you can use the included `convert.py` script:
+If you want to convert models from the original PyTorch checkpoints to MLX format locally, you can use the included `convert.py` script.
+
+### Converting PE-Core Models
 
 ```python
-from convert import save_model_as_safetensors
+from convert import pe_save_model_as_safetensors
 
 # Convert a single model
-save_model_as_safetensors("PE-Core-L14-336", save_path="pe_models")
+pe_save_model_as_safetensors("PE-Core-L14-336", save_path="pe_models")
 
 # Or convert all available models
 model_names = [
@@ -108,7 +158,7 @@ model_names = [
 ]
 
 for model_name in model_names:
-    save_model_as_safetensors(model_name, save_path="pe_models")
+    pe_save_model_as_safetensors(model_name, save_path="pe_models")
 ```
 
 This will:
@@ -127,16 +177,43 @@ pe_models/
     └── model.safetensors.index.json
 ```
 
----
+### Converting Perception-LM Models
 
-## 📖 About Perception Encoder
+```python
+from convert import plm_save_model_as_safetensors
 
-Perception Encoder (PE) is Meta's state-of-the-art family of vision encoders developed by Facebook Research. The PE-Core models are CLIP-style encoders that excel at:
+# Convert a single model
+plm_save_model_as_safetensors("facebook/Perception-LM-3B", save_path="plm_models")
 
-- **Zero-shot Image Classification** — Classify images without task-specific training
-- **Image-Text Retrieval** — Find images matching text queries and vice versa
-- **Video Understanding** — Strong performance on video classification benchmarks
-- **Foundation for VLMs** — Powers the Perception Language Model (PLM)
+# Or convert all available models
+model_names = [
+    "facebook/Perception-LM-1B",
+    "facebook/Perception-LM-3B",
+    "facebook/Perception-LM-8B"
+]
+
+for model_name in model_names:
+    plm_save_model_as_safetensors(model_name, save_path="plm_models")
+```
+
+This will:
+1. Download the original PyTorch checkpoint from Hugging Face Hub
+2. Convert weights to MLX safetensors format
+3. Save the model config (`params.json`) and tokenizer (`tokenizer.model`)
+4. Create an index file for the weights
+
+The converted models will be saved to the specified `save_path` directory with the following structure:
+
+```
+plm_models/
+└── facebook/
+    └── Perception-LM-3B/
+        └── original/
+            ├── consolidated.safetensors
+            ├── model.safetensors.index.json
+            ├── params.json
+            └── tokenizer.model
+```
 
 ---
 

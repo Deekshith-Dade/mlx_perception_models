@@ -5,10 +5,9 @@ from apps.plm.generate_reg import GeneratorArgs, LMGenerator
 from core.args import dataclass_from_dict
 from core.transforms.image_transform import get_image_transform
 
-# ckpt = "facebook/Perception-LM-1B"
-ckpt = "/Users/deekshith/Documents/Projects/multimodal_models/mlx_perception_models/plm_models/facebook/Perception-LM-1B/original"
 # ckpt = "facebook/Perception-LM-3B"
 # ckpt = "facebook/Perception-LM-8B" 
+ckpt = "mlx-community/Perception-LM-3B"
 model, tokenizer, config = load_consolidated_model_and_tokenizer(ckpt)
 
 def generate(
@@ -32,7 +31,7 @@ def generate(
         )
         image = Image.open(media_path).convert("RGB")
         image, _ = transform(image)
-        prompts = ("Describe clearly, what you are seeing?", image)
+        prompts = (question, image)
     # elif media_type == "video":
     #     transform = get_video_transform(
     #         image_res=model.vision_model.image_size,
@@ -65,7 +64,7 @@ def generate(
     print("==============================================")
 
 media_path = "br.jpg"
-question = "Describe clearly, what you are seeing?"
+question = "Is there a man in the image?"
 
 print("Generating with 4 tiles + 1 tumb...")
 generate(media_path=media_path, question=question, number_of_tiles=4, media_type="image")

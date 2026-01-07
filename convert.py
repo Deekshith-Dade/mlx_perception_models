@@ -121,7 +121,8 @@ def plm_save_model_as_safetensors(model_name: str, save_path: str = "plm_models"
 def main():
     # model_name = "PE-Core-L14-336"
     # model_names = ["PE-Core-T16-384", "PE-Core-S16-384", "PE-Core-B16-224", "PE-Core-L14-336", "PE-Core-G14-448"]
-    model_names = ["facebook/Perception-LM-1B"]
+    # model_names = [ "facebook/Perception-LM-3B", "facebook/Perception-LM-8B"]
+    model_names = ["facebook/Perception-LM-8B"]
     for model_name in model_names:
         if "Core" in model_name:
             pe_save_model_as_safetensors(model_name, save_path="pe_models")

@@ -80,7 +80,7 @@ class LMGenerator:
                         module.n_kv_heads,
                         module.head_dim,
                     )
-                    module.kv_cache.offset = 0
+                module.kv_cache.offset = 0
 
     def generate_next_token(self, current_token):
         current_token = current_token
